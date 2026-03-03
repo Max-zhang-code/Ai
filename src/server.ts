@@ -2,7 +2,9 @@
 import * as dotenv from 'dotenv';
 import express from 'express';
 import path from 'path';
-import { OpenAI } from 'openai';
+import { openaiClient } from './services/openaiClient';
+import { OPENAI_CONFIG } from './config/openai';
+import type { ChatMessage } from './types/chat';
 
 dotenv.config();
 
@@ -11,12 +13,6 @@ const port = process.env.PORT || 3000;
 
 // 解析 JSON 请求体
 app.use(express.json());
-
-// 初始化 DeepSeek（兼容 OpenAI SDK）
-const openai = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: 'https://api.deepseek.com/v1',
-});
 
 // 静态页面（前端聊天界面），dist/server.js 运行时 __dirname 指向 dist
 const publicDir = path.join(__dirname, '../public');
@@ -31,23 +27,22 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'message is required' });
     }
 
-    const messages =
+    const messages: ChatMessage[] =
       Array.isArray(history) && history.length > 0
         ? history
         : [
             {
               role: 'system',
-              content:
-                '你是一个聪明、幽默的前端+Node.js全栈工程师，帮用户解决问题，用中文回复。',
+              content: OPENAI_CONFIG.SYSTEM_PROMPT,
             },
           ];
 
     messages.push({ role: 'user', content: message });
 
-    const completion = await openai.chat.completions.create({
-      model: 'deepseek-chat',
-      messages: messages as any,
-      temperature: 0.7,
+    const completion = await openaiClient.chat.completions.create({
+      model: OPENAI_CONFIG.MODEL,
+      messages: messages,
+      temperature: OPENAI_CONFIG.TEMPERATURE,
       stream: false,
     });
 
