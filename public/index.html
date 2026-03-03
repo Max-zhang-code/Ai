@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <title>DeepSeek Chat</title>
+    <title>Max Chat</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       :root {
@@ -156,12 +156,70 @@
         color: var(--text-main);
         white-space: pre-wrap;
         word-wrap: break-word;
+        overflow-wrap: break-word;
+        position: relative;
+        max-height: 300px;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      .message-bubble::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .message-bubble::-webkit-scrollbar-track {
+        background: rgba(148, 163, 184, 0.1);
+        border-radius: 3px;
+      }
+
+      .message-bubble::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.3);
+        border-radius: 3px;
+      }
+
+      .message-bubble::-webkit-scrollbar-thumb:hover {
+        background: rgba(148, 163, 184, 0.5);
+      }
+
+      .message-bubble:hover .delete-btn {
+        opacity: 1;
+      }
+
+      .delete-btn {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #ef4444;
+        color: white;
+        border: none;
+        font-size: 12px;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+
+      .delete-btn:hover {
+        background: #dc2626;
+        transform: scale(1.1);
       }
 
       .message-bubble.user {
-        background: linear-gradient(135deg, #0ea5e9, #38bdf8);
-        border-color: rgba(56, 189, 248, 0.9);
-        color: #0b1120;
+        background: linear-gradient(135deg, #1e40af, #3b82f6);
+        border-color: rgba(59, 130, 246, 0.9);
+        color: #ffffff;
+      }
+
+      .message-bubble.user .message-meta {
+        color: rgba(255, 255, 255, 0.95);
+        font-weight: 600;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
       }
 
       .message-meta {
@@ -185,13 +243,18 @@
       }
 
       .avatar.user {
-        background: radial-gradient(
-          circle at 30% 30%,
-          #22c55e 0,
-          #4ade80 35%,
-          #16a34a 100%
+        background: linear-gradient(
+          135deg,
+          #d97706 0%,
+          #f59e0b 50%,
+          #d97706 100%
         );
-        box-shadow: 0 0 12px rgba(74, 222, 128, 0.65);
+        box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+        border: 2px solid rgba(251, 191, 36, 0.9);
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 700;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
       }
 
       .typing {
@@ -331,13 +394,32 @@
         <div class="title-group">
           <div class="logo-dot"></div>
           <div>
-            <div class="title-text-main">DeepSeek Chat</div>
+            <div class="title-text-main">Max Chat</div>
             <div class="title-text-sub">
-              本地前端 + Node.js 后端 · 类 ChatGPT 体验
+              纯HTML/CSS/JS前端 + Node.js/Express后端 · gpt-oss:120b-cloud模型
             </div>
           </div>
         </div>
-        <div class="header-badge">DEEPSEEK_API_KEY 来自本地 .env</div>
+        <div style="display: flex; gap: 8px; align-items: center">
+          <button
+            id="clearBtn"
+            style="
+              padding: 4px 10px;
+              border: 1px solid rgba(56, 189, 248, 0.5);
+              border-radius: 6px;
+              background: transparent;
+              color: #e0f2fe;
+              font-size: 12px;
+              cursor: pointer;
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.background = 'rgba(56, 189, 248, 0.2)'"
+            onmouseout="this.style.background = 'transparent'"
+          >
+            清空记录
+          </button>
+          <div class="header-badge">120B云端模型 · Ollama驱动</div>
+        </div>
       </header>
       <main class="chat-main">
         <div id="messages" class="messages"></div>
@@ -362,21 +444,61 @@
       const sendBtn = document.getElementById('send');
       const errorEl = document.getElementById('error');
 
-      let history = [
-        {
-          role: 'system',
-          content:
-            '你是一个聪明、幽默的前端+Node.js全栈工程师，帮用户解决问题，用中文回复。',
-        },
-      ];
+      // 从 localStorage 加载聊天记录
+      function loadHistory() {
+        const saved = localStorage.getItem('maxChatHistory');
+        if (saved) {
+          try {
+            return JSON.parse(saved);
+          } catch (e) {
+            console.error('加载聊天记录失败:', e);
+          }
+        }
+        return [
+          {
+            role: 'system',
+            content:
+              '你是一个聪明、幽默的前端+Node.js全栈工程师，帮用户解决问题，用中文回复。',
+          },
+        ];
+      }
+
+      // 保存聊天记录到 localStorage
+      function saveHistory() {
+        localStorage.setItem('maxChatHistory', JSON.stringify(history));
+      }
+
+      // 清空聊天记录
+      function clearHistory() {
+        history = [
+          {
+            role: 'system',
+            content:
+              '你是一个聪明、幽默的前端+Node.js全栈工程师，帮用户解决问题，用中文回复。',
+          },
+        ];
+        saveHistory();
+        renderMessages(false);
+      }
+
+      // 删除单条消息
+      function deleteMessage(index) {
+        if (confirm('确定要删除这条消息吗？')) {
+          history.splice(index, 1);
+          saveHistory();
+          renderMessages(false);
+        }
+      }
+
+      let history = loadHistory();
 
       let isSending = false;
 
       function renderMessages(showTyping) {
         messagesEl.innerHTML = '';
 
-        for (const msg of history) {
-          if (msg.role === 'system') continue;
+        history.forEach((msg, index) => {
+          if (msg.role === 'system') return;
 
           const row = document.createElement('div');
           row.className =
@@ -385,6 +507,13 @@
           const avatar = document.createElement('div');
           avatar.className =
             'avatar ' + (msg.role === 'user' ? 'user' : 'assistant');
+          avatar.textContent = msg.role === 'user' ? '我' : 'AI';
+          avatar.style.display = 'flex';
+          avatar.style.alignItems = 'center';
+          avatar.style.justifyContent = 'center';
+          avatar.style.fontSize = '10px';
+          avatar.style.fontWeight = 'bold';
+          avatar.style.color = '#fff';
 
           const bubble = document.createElement('div');
           bubble.className =
@@ -392,13 +521,21 @@
 
           const meta = document.createElement('div');
           meta.className = 'message-meta';
-          meta.textContent = msg.role === 'user' ? '你' : 'DeepSeek';
+          meta.textContent = msg.role === 'user' ? '你' : 'AI';
 
           const content = document.createElement('div');
           content.textContent = msg.content;
 
+          // 添加删除按钮
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'delete-btn';
+          deleteBtn.innerHTML = '×';
+          deleteBtn.title = '删除这条消息';
+          deleteBtn.onclick = () => deleteMessage(index);
+
           bubble.appendChild(meta);
           bubble.appendChild(content);
+          bubble.appendChild(deleteBtn);
 
           if (msg.role === 'user') {
             row.appendChild(bubble);
@@ -409,7 +546,7 @@
           }
 
           messagesEl.appendChild(row);
-        }
+        });
 
         if (showTyping) {
           const row = document.createElement('div');
@@ -417,13 +554,20 @@
 
           const avatar = document.createElement('div');
           avatar.className = 'avatar assistant';
+          avatar.textContent = 'AI';
+          avatar.style.display = 'flex';
+          avatar.style.alignItems = 'center';
+          avatar.style.justifyContent = 'center';
+          avatar.style.fontSize = '10px';
+          avatar.style.fontWeight = 'bold';
+          avatar.style.color = '#fff';
 
           const bubble = document.createElement('div');
           bubble.className = 'message-bubble assistant';
 
           const meta = document.createElement('div');
           meta.className = 'message-meta';
-          meta.textContent = 'DeepSeek 正在思考…';
+          meta.textContent = 'AI 正在思考…';
 
           const typing = document.createElement('div');
           typing.className = 'typing';
@@ -453,19 +597,24 @@
         errorEl.style.display = 'none';
         errorEl.textContent = '';
 
-        history.push({ role: 'user', content: text });
+        // 先渲染用户消息（不添加到 history，让后端处理）
+        const userMessage = { role: 'user', content: text };
+        const tempHistory = [...history, userMessage];
         inputEl.value = '';
 
         isSending = true;
         sendBtn.disabled = true;
 
+        // 使用临时 history 渲染，包含用户消息
+        const originalHistory = history;
+        history = tempHistory;
         renderMessages(true);
 
         try {
           const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text, history }),
+            body: JSON.stringify({ message: text, history: originalHistory }),
           });
 
           const data = await res.json();
@@ -480,12 +629,15 @@
             history.push({ role: 'assistant', content: data.reply });
           }
 
+          // 保存聊天记录
+          saveHistory();
+
           renderMessages(false);
         } catch (err) {
           console.error(err);
           errorEl.style.display = 'block';
           errorEl.textContent =
-            '调用 deepseek-chat 失败：' +
+            '调用 AI 失败：' +
             (err && err.message ? err.message : 'Unknown error');
           renderMessages(false);
         } finally {
@@ -497,6 +649,13 @@
 
       sendBtn.addEventListener('click', sendMessage);
 
+      // 清空记录按钮
+      document.getElementById('clearBtn').addEventListener('click', () => {
+        if (confirm('确定要清空所有聊天记录吗？')) {
+          clearHistory();
+        }
+      });
+
       inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
@@ -504,7 +663,7 @@
         }
       });
 
-      // 初始渲染（空对话）
+      // 初始渲染（加载保存的记录）
       renderMessages(false);
       inputEl.focus();
     </script>

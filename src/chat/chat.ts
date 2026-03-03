@@ -82,7 +82,7 @@ async function chat() {
   );
 
   while (true) {
-    const userInput = readlineSync.question('你: ').trim();
+    const userInput = readlineSync.question('[You]: ').trim();
 
     // 检查是否为退出命令
     if (userInput.toLowerCase() === 'exit' || userInput === '退出') break;
