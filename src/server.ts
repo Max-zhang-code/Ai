@@ -2,6 +2,7 @@
 import * as dotenv from 'dotenv';
 import express from 'express';
 import path from 'path';
+import open from 'open';
 import { openaiClient } from './services/openaiClient';
 import { OPENAI_CONFIG } from './config/openai';
 import type { ChatMessage } from './types/chat';
@@ -62,6 +63,13 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Chat UI is running at http://localhost:${port}`);
+app.listen(port, async () => {
+  const url = `http://localhost:${port}`;
+  console.log(`Chat UI is running at ${url}`);
+
+  try {
+    await open(url);
+  } catch (err) {
+    console.log('请手动打开浏览器访问:', url);
+  }
 });
